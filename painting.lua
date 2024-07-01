@@ -114,7 +114,8 @@ core.register_entity("painting:picent", {
 		end
 		if data.version ~= current_version then
 			core.log("info", "[painting] updating placed picture data")
-			legacy.fix_grid(data.grid, data.version)
+			local res = legacy.fix_grid(data.grid, data.version, pos, node_meta:to_table())
+			if not res then return end
 			data.version = current_version
 			node_meta:set_int("resolution", data.res)
 			node_meta:set_string("version", data.version)
@@ -277,7 +278,8 @@ core.register_entity("painting:paintent", {
 		self.res = data.res
 		self.version = data.version
 		self.grid = data.grid
-		legacy.fix_grid(self.grid, self.version)
+		local res = legacy.fix_grid(self.grid, self.version, self.object:get_pos(), staticdata)
+		if not res then return end
     self.version = current_version
 		self.object:set_properties{ textures = { painting.to_imagestring(self.grid, self.res) }}
 		if not self.fd then
@@ -344,7 +346,8 @@ core.register_craftitem("painting:paintedcanvas", {
 		else
 			data.grid = core.deserialize(painting.decompress(data.grid))
 		end
-		legacy.fix_grid(data.grid, data.version)
+		local res = legacy.fix_grid(data.grid, data.version, pos, node_meta:to_table())
+		if not res then return end
 		data.version = current_version
 		node_meta:set_int("resolution", data.res)
 		node_meta:set_string("version", data.version)
@@ -419,8 +422,8 @@ core.register_node("painting:canvasnode", {
 		if not data.grid then
 			return
 		end
-		legacy.fix_grid(data.grid, data.version)
-    data.version = current_version
+		local res = legacy.fix_grid(data.grid, data.version, pos, data)
+		data.version = current_version
 		local item = ItemStack("painting:paintedcanvas")
 		local item_meta = item:get_meta()
 		item_meta:set_int("resolution", data.res)
@@ -608,7 +611,19 @@ core.register_alias("easel", "painting:easel")
 core.register_alias("canvas", "painting:canvas_16")
 
 -- fixes the colours which were set by pairs
-local function fix_eldest_grid(data)
+---@param data table
+---@param pos Position?
+---@param staticdata any?
+local function fix_eldest_grid(data, pos, staticdata)
+	-- DEBUG
+	if type(data) ~= "table" then
+		minetest.log("error", "[painting] can't fix legacy painting:")
+		print("pos:", pos)
+		print("node_meta:", dump(staticdata))
+		print(debug.traceback())
+		return
+	end
+
 	for y in pairs(data) do
 		local xs = data[y]
 		for x in pairs(xs) do
@@ -630,19 +645,25 @@ local function fix_nopairs_grid(data)
 end
 
 -- possibly updates grid
-function legacy.fix_grid(grid, version)
+---@param grid table
+---@param version string
+---@param pos Position?
+---@param staticdata any?
+function legacy.fix_grid(grid, version, pos, staticdata)
 	if version == current_version then
-		return
+		return true
 	end
 
 	core.log("info", "[painting] updating grid version "..dump(version))
 	--print("Updating grid version "..dump(version))
 	
+	local res
 	if version == "nopairs" then
-		fix_nopairs_grid(grid)
+		res = fix_nopairs_grid(grid)
 	else
-		fix_eldest_grid(grid)
+		res = fix_eldest_grid(grid, pos, staticdata)
 	end
+	return res
 end
 
 -- gets the compressed data from meta
