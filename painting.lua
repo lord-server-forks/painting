@@ -447,15 +447,9 @@ core.register_node("painting:canvasnode", {
 					if obj:is_valid() then
 						obj:set_properties{textures = {}}
 						obj:remove()
-						--core.log("action", "[painting] _paintent_uuid succesfully removed")
-					else
-						--core.log("error", "[painting] _paintent_uuid is an invalid object")
+						node_meta:set_string("paintent_uuid", " ")
 					end
-				else
-					--core.log("error", "[paintent] _paintent_uuid object is does no longer exist")
 				end
-			else 
-				--core.log("error", "[paintent] _paintent_uuid is nil")
 			end
 		end
 	end,
@@ -528,9 +522,8 @@ core.register_node("painting:easel", {
 		pos.z = pos.z - 0.01 * dir.z
 
 		local obj = core.add_entity(pos, "painting:paintent")
-		--canvasnode._paintent_obj_uuid = obj:get_luaentity().object:get_guid()
-		canvasnode_meta:set_string("paintent_uuid", obj:get_luaentity().object:get_guid())
-		core.log("action", "paintent uuid:" .. canvasnode_meta:get_string("paintent_uuid"))
+		canvasnode_meta:set_string("paintent_uuid", obj:get_luaentity().object:get_guid()) -- we must store object id in the node meta so that we can later adress the entity and remove it
+		
 		obj:set_properties{ collisionbox = paintbox[fd%2] }
 		obj:set_armor_groups{immortal=1}
 		obj:set_yaw(math.pi * fd / -2)
