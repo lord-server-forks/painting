@@ -277,7 +277,7 @@ core.register_entity("painting:paintent", {
 		self.res = data.res
 		self.version = data.version
 		self.grid = data.grid
-		legacy.fix_grid(self.grid, self.version)
+		--legacy.fix_grid(self.grid, self.version)
     self.version = current_version
 		self.object:set_properties{ textures = { painting.to_imagestring(self.grid, self.res) }}
 		if not self.fd then
@@ -286,6 +286,12 @@ core.register_entity("painting:paintent", {
 		self.object:set_properties{ collisionbox = paintbox[self.fd%2] }
 		self.object:set_armor_groups{immortal=1}
 	end,
+
+	-- fix https://github.com/lord-server/lord/issues/2383 
+	--on_detach = function(self, removal)
+	--	self.object:set_properties{textures = {}}
+	--	self.object:remove()
+	--end,
 
 	get_staticdata = function(self)
 		return core.serialize{fd = self.fd, res = self.res,
@@ -396,6 +402,8 @@ core.register_node("painting:canvasnode", {
 		not_in_creative_inventory=1},
 
 	drop = "",
+	
+	_paintent_obj_uuid = nil,
 
 	after_dig_node = function(pos, oldnode, oldmetadata, digger)
 		--get data and remove pixels
@@ -427,7 +435,30 @@ core.register_node("painting:canvasnode", {
 		item_meta:set_string("version", data.version)
 		item_meta:set_string("grid", painting.compress(core.serialize(data.grid)))
 		digger:get_inventory():add_item("main", item)
-	end
+	end,
+	
+	on_destruct = function(pos)
+		local node_meta = core.get_meta(pos)
+		if node_meta then
+			local paintent_uuid = node_meta:get_string("paintent_uuid")
+			if paintent_uuid then
+				local obj = core.objects_by_guid[paintent_uuid]
+				if obj then
+					if obj:is_valid() then
+						obj:set_properties{textures = {}}
+						obj:remove()
+						--core.log("action", "[painting] _paintent_uuid succesfully removed")
+					else
+						--core.log("error", "[painting] _paintent_uuid is an invalid object")
+					end
+				else
+					--core.log("error", "[paintent] _paintent_uuid object is does no longer exist")
+				end
+			else 
+				--core.log("error", "[paintent] _paintent_uuid is nil")
+			end
+		end
+	end,
 })
 
 local easelbox = { -- Specifies 3d model.
@@ -489,12 +520,17 @@ core.register_node("painting:easel", {
 		end
 
 		core.add_node(pos, { name = "painting:canvasnode", param2 = fd})
+		local canvasnode = core.get_node(pos)
+		local canvasnode_meta = core.get_meta(pos)
 
 		local dir = dirs[fd]
 		pos.x = pos.x - 0.01 * dir.x
 		pos.z = pos.z - 0.01 * dir.z
 
 		local obj = core.add_entity(pos, "painting:paintent")
+		--canvasnode._paintent_obj_uuid = obj:get_luaentity().object:get_guid()
+		canvasnode_meta:set_string("paintent_uuid", obj:get_luaentity().object:get_guid())
+		core.log("action", "paintent uuid:" .. canvasnode_meta:get_string("paintent_uuid"))
 		obj:set_properties{ collisionbox = paintbox[fd%2] }
 		obj:set_armor_groups{immortal=1}
 		obj:set_yaw(math.pi * fd / -2)
