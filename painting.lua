@@ -477,7 +477,17 @@ core.register_node("painting:easel", {
 			-- this is not likely going to happen
 			return
 		end
+		
+		-- A screwdriver can rotate easel in 3D space.
+		-- Because of this node.param2 can have values not just 0..3 but also 4..7, 8..11, 12..15, 16..19, 20..23.
+		-- Failing to address these values crash the server as pointed out in: https://github.com/lord-server/lord/issues/2380 .
+		-- TODO: Handle 3D coordinates adequately to place canvas right on the easel.
 		local fd = node.param2
+		
+		if fd > 3 then
+			return
+		end
+
 		core.add_node(pos, { name = "painting:canvasnode", param2 = fd})
 
 		local dir = dirs[fd]
