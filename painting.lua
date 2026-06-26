@@ -235,35 +235,40 @@ core.register_entity("painting:paintent", {
 	},
 
 	on_punch = function(self, puncher)
-		--check for brush.
-		local wielded = puncher:get_wielded_item()
-		local def = wielded:get_definition()
-		if (not def) or (not def._painting_brush) then -- Not one of the brushes; can't paint.
-			return
-		end
-		local color = def._painting_brush.color
-		if not color then
-			local meta = puncher:get_wielded_item():get_meta()
-			color = meta:get("color")
-		end
-		if not color then
-			core.log("warning", "[painting] Brush color not found - "..def.name)
-			return
-		end
-
-		assert(self.object)
-		local x,y = figure_paint_pos(self, puncher)
-		draw_input(self, def._painting_brush, x,y, puncher:get_player_control().sneak)
-		
-		if not core.is_creative_enabled(puncher:get_player_name())
-				and def._painting_brush.wear then
-			wielded:add_wear(def._painting_brush.wear)
-			if wielded:get_count()==0 then
-				if def._painting_brush.break_stack then
-					wielded = ItemStack(def._painting_brush.break_stack)
-				end
+		if puncher:is_player() == true then
+			--check for brush.
+			local wielded = puncher:get_wielded_item()
+			local def = wielded:get_definition()
+			if (not def) or (not def._painting_brush) then -- Not one of the brushes; can't paint.
+				return
 			end
-			puncher:set_wielded_item(wielded)
+			local color = def._painting_brush.color
+			if not color then
+				local meta = puncher:get_wielded_item():get_meta()
+				color = meta:get("color")
+			end
+			if not color then
+				core.log("warning", "[painting] Brush color not found - "..def.name)
+				return
+			end
+
+			assert(self.object)
+			local x,y = figure_paint_pos(self, puncher)
+			draw_input(self, def._painting_brush, x,y, puncher:get_player_control().sneak)
+			
+			if not core.is_creative_enabled(puncher:get_player_name())
+					and def._painting_brush.wear then
+				wielded:add_wear(def._painting_brush.wear)
+				if wielded:get_count()==0 then
+					if def._painting_brush.break_stack then
+						wielded = ItemStack(def._painting_brush.break_stack)
+					end
+				end
+				puncher:set_wielded_item(wielded)
+			end
+		else
+			self.object:set_armor_groups{immortal=0}
+			self.object:set_hp(0)
 		end
 	end,
 
@@ -277,7 +282,7 @@ core.register_entity("painting:paintent", {
 		self.res = data.res
 		self.version = data.version
 		self.grid = data.grid
-		--legacy.fix_grid(self.grid, self.version)
+		legacy.fix_grid(self.grid, self.version)
     self.version = current_version
 		self.object:set_properties{ textures = { painting.to_imagestring(self.grid, self.res) }}
 		if not self.fd then
@@ -286,12 +291,6 @@ core.register_entity("painting:paintent", {
 		self.object:set_properties{ collisionbox = paintbox[self.fd%2] }
 		self.object:set_armor_groups{immortal=1}
 	end,
-
-	-- fix https://github.com/lord-server/lord/issues/2383 
-	--on_detach = function(self, removal)
-	--	self.object:set_properties{textures = {}}
-	--	self.object:remove()
-	--end,
 
 	get_staticdata = function(self)
 		return core.serialize{fd = self.fd, res = self.res,
@@ -402,8 +401,6 @@ core.register_node("painting:canvasnode", {
 		not_in_creative_inventory=1},
 
 	drop = "",
-	
-	_paintent_obj_uuid = nil,
 
 	after_dig_node = function(pos, oldnode, oldmetadata, digger)
 		--get data and remove pixels
@@ -435,23 +432,6 @@ core.register_node("painting:canvasnode", {
 		item_meta:set_string("version", data.version)
 		item_meta:set_string("grid", painting.compress(core.serialize(data.grid)))
 		digger:get_inventory():add_item("main", item)
-	end,
-	
-	on_destruct = function(pos)
-		local node_meta = core.get_meta(pos)
-		if node_meta then
-			local paintent_uuid = node_meta:get_string("paintent_uuid")
-			if paintent_uuid then
-				local obj = core.objects_by_guid[paintent_uuid]
-				if obj then
-					if obj:is_valid() then
-						obj:set_properties{textures = {}}
-						obj:remove()
-						node_meta:set_string("paintent_uuid", " ")
-					end
-				end
-			end
-		end
 	end,
 })
 
@@ -516,14 +496,13 @@ core.register_node("painting:easel", {
 		core.add_node(pos, { name = "painting:canvasnode", param2 = fd})
 		local canvasnode = core.get_node(pos)
 		local canvasnode_meta = core.get_meta(pos)
+		core.log("action", "canvasnode pos: (" .. pos.x .. " / " .. pos.y .. " / " .. pos.z .. ")")
 
 		local dir = dirs[fd]
 		pos.x = pos.x - 0.01 * dir.x
 		pos.z = pos.z - 0.01 * dir.z
 
 		local obj = core.add_entity(pos, "painting:paintent")
-		canvasnode_meta:set_string("paintent_uuid", obj:get_luaentity().object:get_guid()) -- we must store object id in the node meta so that we can later adress the entity and remove it
-		
 		obj:set_properties{ collisionbox = paintbox[fd%2] }
 		obj:set_armor_groups{immortal=1}
 		obj:set_yaw(math.pi * fd / -2)
