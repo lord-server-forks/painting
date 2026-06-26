@@ -267,7 +267,7 @@ core.register_entity("painting:paintent", {
 				puncher:set_wielded_item(wielded)
 			end
 		else
-			self.object:set_armor_groups{immortal=0}
+			-- nazgul's explosive attacks or other mobs destroy the entity irreversably
 			self.object:set_hp(0)
 		end
 	end,
