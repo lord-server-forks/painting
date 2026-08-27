@@ -640,6 +640,7 @@ core.register_alias("canvas", "painting:canvas_16")
 
 -- fixes the colours which were set by pairs
 local function fix_eldest_grid(data)
+	data = data or {}
 	for y in pairs(data) do
 		local xs = data[y]
 		for x in pairs(xs) do
